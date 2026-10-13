@@ -1,7 +1,7 @@
 import requests
 import streamlit as st
 
-MODEL_ID = "google/gemma-4-26b-a4b-it:free"
+MODEL_ID = "nvidia/nemotron-3-super:free"
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
