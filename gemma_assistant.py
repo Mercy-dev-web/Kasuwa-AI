@@ -62,6 +62,9 @@ def ask_gemma(question, business_context=""):
 
         message = choices[0].get("message", {})
         content = message.get("content")
+        
+        if not content and message.get("reasoning"):
+            content = message["reasoning"]
 
         if isinstance(content, str) and content.strip():
             return content
