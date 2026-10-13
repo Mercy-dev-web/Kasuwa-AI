@@ -3,3 +3,4 @@ pandas
 scikit-learn
 Pillow
 huggingface_hub
+openpyxl
