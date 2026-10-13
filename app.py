@@ -32,7 +32,7 @@ uploaded_file = st.file_uploader(
     "Upload your sales records (CSV or Excel)",
     type=["csv", "xlsx", "xls"]
 )
-)
+
 
 business_context = (
     f"The trader's available restocking budget is ₦{budget:,.2f}."
