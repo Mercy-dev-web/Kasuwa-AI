@@ -18,8 +18,10 @@ def ask_gemma(question, business_context=""):
 
     try:
         client = InferenceClient(
-            model=MODEL_ID,
-            token=token,
+    model=MODEL_ID,
+    provider="auto",
+    api_key=token,
+)
         )
 
         response = client.chat_completion(
