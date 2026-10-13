@@ -7,8 +7,6 @@ API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
 def ask_gemma(question, business_context=""):
-    """Ask an open-weight AI model to help a small business owner."""
-
     try:
         api_key = st.secrets["OPENROUTER_API_KEY"]
     except Exception:
@@ -32,7 +30,7 @@ def ask_gemma(question, business_context=""):
                             "small business owners. Explain sales and "
                             "restocking decisions simply. Use only the "
                             "provided information. Never invent figures. "
-                            "If information is missing, say so."
+                            "Clearly state when information is missing."
                         ),
                     },
                     {
@@ -55,41 +53,7 @@ def ask_gemma(question, business_context=""):
                 f"{response.text[:500]}"
             )
 
-        
-data = response.json()
-choices = data.get("choices", [])
-
-if not choices:
-    return f"No answer returned. Response: {str(data)[:1000]}"
-
-choice = choices[0]
-message = choice.get("message", {})
-content = message.get("content")
-
-if isinstance(content, str) and content.strip():
-    return content
-
-if isinstance(content, list):
-    parts = []
-    for item in content:
-        if isinstance(item, dict) and item.get("text"):
-            parts.append(item["text"])
-    if parts:
-        return "\n".join(parts)
-
-if message.get("reasoning"):
-    return (
-        "The model returned reasoning but no final answer. "
-        "Please try again or use another model."
-    )
-
-return (
-    "The provider returned no readable text. "
-    f"Finish reason: {choice.get('finish_reason')}. "
-    f"Message fields: {list(message.keys())}. "
-    f"Response fields: {list(data.keys())}."
-)
-
+        data = response.json()
         choices = data.get("choices", [])
 
         if not choices:
@@ -101,9 +65,20 @@ return (
         if isinstance(content, str) and content.strip():
             return content
 
+        if isinstance(content, list):
+            parts = [
+                item["text"]
+                for item in content
+                if isinstance(item, dict) and item.get("text")
+            ]
+            if parts:
+                return "\n".join(parts)
+
+        finish_reason = choices[0].get("finish_reason")
         return (
-            "The AI provider returned an empty answer. "
-            "Please try again."
+            "The provider returned no readable text. "
+            f"Finish reason: {finish_reason}. "
+            f"Message fields: {list(message.keys())}."
         )
 
     except requests.RequestException as error:
