@@ -39,14 +39,14 @@ st.write(
 )
 
 uploaded_files = st.file_uploader(
-    "Upload spreadsheets or up to 8 photos",
+    "Upload spreadsheets or up to 15 photos",
     type=["csv", "xlsx", "xls", "png", "jpg", "jpeg"],
     accept_multiple_files=True,
     help="You can select multiple files at once."
 )
 
-if uploaded_files and len(uploaded_files) > 8:
-    st.warning("Please upload a maximum of 8 files.")
+if uploaded_files and len(uploaded_files) > 15:
+    st.warning("Please upload a maximum of 15 files.")
     uploaded_files = []
 
 # Camera feature for mobile users
