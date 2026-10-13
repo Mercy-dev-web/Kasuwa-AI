@@ -1,7 +1,7 @@
 import streamlit as st
 from huggingface_hub import InferenceClient
 
-MODEL_ID = "google/gemma-2-2b-it"
+MODEL_ID = "google/gemma-3-4b-it"
 
 
 def ask_gemma(question, business_context=""):
