@@ -40,7 +40,10 @@ business_context = (
 
 if uploaded_file is not None:
     try:
-        sales_data = pd.read_csv(uploaded_file)
+        if uploaded_file.name.endswith(".csv"):
+    sales_data = pd.read_csv(uploaded_file)
+else:
+    sales_data = pd.read_excel(uploaded_file)
 
         st.success("Sales records uploaded successfully!")
 
