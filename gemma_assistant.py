@@ -41,8 +41,9 @@ def ask_gemma(question, business_context=""):
                         ),
                     },
                 ],
-                "max_tokens": 300,
+                "max_tokens": 800,
                 "temperature": 0.3,
+                "reasoning": {"effort": "low"}
             },
             timeout=60,
         )
