@@ -1,79 +1,65 @@
-import streamlit as st
+
+import json
+import re
+
 import pandas as pd
-from gemma_assistant import ask_gemma
+import streamlit as st
+
+from gemma_assistant import ask_gemma, extract_sales_from_images
+
 
 st.set_page_config(
     page_title="Kasuwa AI",
     page_icon="🛍️",
-    layout="wide"
+    layout="wide",
 )
 
 st.title("🛍️ Kasuwa AI")
-st.subheader("Your AI business assistant")
+st.subheader("Less guesswork. Smarter stocking.")
 
 st.write(
-    "Understand your sales, manage your stock, "
-    "and make smarter restocking decisions."
+    "Your AI-powered business assistant for understanding "
+    "sales and making smarter restocking decisions."
 )
 
-st.divider()
+if "extracted_sales" not in st.session_state:
+    st.session_state.extracted_sales = []
 
-# Business budget
-st.header("💰 Your Restocking Budget")
+if "extraction_notes" not in st.session_state:
+    st.session_state.extraction_notes = ""
+
+if "extraction_raw" not in st.session_state:
+    st.session_state.extraction_raw = ""
+
+
+st.divider()
+st.header("1. Your Business")
 
 budget = st.number_input(
     "How much money do you have for restocking? (₦)",
-    min_value=0,
-    value=10000,
-    step=1000
-)
-
-st.divider()
-
-# Upload sales records
-st.header("📒 Your Sales Records")
-
-st.write(
-    "Upload your sales spreadsheet or select photos "
-    "of your handwritten sales book."
+    min_value=0.0,
+    value=10000.0,
+    step=500.0,
 )
 
 uploaded_files = st.file_uploader(
-    "Upload spreadsheets or up to 15 photos",
-    type=["csv", "xlsx", "xls", "png", "jpg", "jpeg"],
+    "Upload sales spreadsheets or photos of your sales book",
+    type=["csv", "xlsx", "xls", "png", "jpg", "jpeg", "webp"],
     accept_multiple_files=True,
-    help="You can select multiple files at once."
+    help="Upload up to 8 files at a time.",
 )
-
-if uploaded_files and len(uploaded_files) > 15:
-    st.warning("Please upload a maximum of 15 files.")
-    uploaded_files = []
-
-# Camera feature for mobile users
-st.subheader("📸 Take a Photo of Your Sales Book")
 
 camera_photo = st.camera_input(
-    "Take a picture of a page"
+    "Or take a photo of a sales book page"
 )
 
-if camera_photo is not None:
-    st.success("Photo captured successfully!")
-    st.image(
-        camera_photo,
-        caption="Captured sales book page",
-        use_container_width=True
-    )
-    st.info(
-        "Your photo has been captured. "
-        "Reading the figures from photos is not connected yet."
-    )
-
-# Process uploaded files
 dataframes = []
 image_files = []
 
-if uploaded_files:
-    for file in uploaded_files:
+if uploaded_files and len(uploaded_files) > 8:
+    st.warning("Please upload a maximum of 8 files.")
+else:
+    for file in uploaded_files or []:
         filename = file.name.lower()
 
         try:
@@ -87,112 +73,206 @@ if uploaded_files:
                 df["source_file"] = file.name
                 dataframes.append(df)
 
-            elif filename.endswith((".png", ".jpg", ".jpeg")):
+            elif filename.endswith(
+                (".png", ".jpg", ".jpeg", ".webp")
+            ):
                 image_files.append(file)
 
         except Exception as error:
-            st.error(
-                f"Could not read {file.name}: {error}"
-            )
+            st.error(f"Could not read {file.name}: {error}")
+
+if camera_photo is not None:
+    image_files.append(camera_photo)
 
 if image_files:
-    st.success(
-        f"{len(image_files)} photo(s) uploaded successfully."
-    )
+    st.write(f"**Photos received:** {len(image_files)}")
 
-    for image_file in image_files:
+    for index, image in enumerate(image_files, start=1):
         st.image(
-            image_file,
-            caption=image_file.name,
-            use_container_width=True
+            image,
+            caption=getattr(image, "name", f"Sales photo {index}"),
+            use_container_width=True,
         )
 
-    st.info(
-        "Kasuwa AI can receive these photos, but we still "
-        "need to connect handwriting recognition before "
-        "it can extract your sales information."
-    )
+    if len(image_files) > 8:
+        st.warning(
+            "Please use a maximum of 8 photos at a time, "
+            "including the camera photo."
+        )
+    else:
+        if st.button(
+            "Read My Sales Book",
+            type="primary",
+        ):
+            with st.spinner(
+                "Kasuwa AI is reading your sales book..."
+            ):
+                raw_result = extract_sales_from_images(image_files)
 
-# Combine spreadsheet records
+            st.session_state.extraction_raw = raw_result
+
+            try:
+                # Allow for a response wrapped in Markdown fences.
+                cleaned = re.sub(
+                    r"^\s*```(?:json)?\s*|\s*```\s*$",
+                    "",
+                    raw_result.strip(),
+                    flags=re.IGNORECASE,
+                )
+
+                # Recover the JSON object if extra text surrounds it.
+                start = cleaned.find("{")
+                end = cleaned.rfind("}")
+
+                if start != -1 and end > start:
+                    cleaned = cleaned[start:end + 1]
+
+                parsed = json.loads(cleaned)
+
+                records = parsed.get("records", [])
+                notes = parsed.get("notes", "")
+
+                if not isinstance(records, list):
+                    raise ValueError(
+                        "The returned records were not in list format."
+                    )
+
+                st.session_state.extracted_sales = records
+                st.session_state.extraction_notes = str(notes)
+
+            except (json.JSONDecodeError, ValueError, TypeError):
+                st.session_state.extracted_sales = []
+                st.session_state.extraction_notes = (
+                    "Kasuwa could not convert the response into a "
+                    "usable table. See the raw response below."
+                )
+
+if st.session_state.extraction_notes:
+    st.info(st.session_state.extraction_notes)
+
+if st.session_state.extraction_raw and not st.session_state.extracted_sales:
+    with st.expander("View the AI response"):
+        st.text(st.session_state.extraction_raw)
+
+
+# Combine any uploaded spreadsheets.
 sales_data = None
 
 if dataframes:
-    sales_data = pd.concat(
-        dataframes,
-        ignore_index=True
-    )
+    sales_data = pd.concat(dataframes, ignore_index=True)
 
     st.success("Spreadsheet records processed successfully!")
-
-    st.subheader("📊 Preview of Your Sales Records")
+    st.subheader("Spreadsheet preview")
 
     st.dataframe(
         sales_data.head(10),
-        use_container_width=True
+        use_container_width=True,
     )
 
-    st.metric(
-        "Total records",
-        len(sales_data)
-    )
+    st.metric("Spreadsheet records", len(sales_data))
+
+# Display and allow correction of extracted handwriting.
+reviewed_sales = None
+
+if st.session_state.extracted_sales:
+    st.divider()
+    st.header("2. Review Your Sales Records")
 
     st.write(
-        "Available columns:",
-        ", ".join(map(str, sales_data.columns))
+        "Check the extracted figures carefully. You can edit cells "
+        "before using these records for business questions."
     )
 
-st.divider()
+    extracted_df = pd.DataFrame(
+        st.session_state.extracted_sales
+    )
 
-# AI assistant
-st.header("🤖 Ask Kasuwa AI")
+    expected_columns = [
+        "date",
+        "product",
+        "quantity",
+        "unit_price",
+        "total_amount",
+    ]
 
-st.write(
-    "Ask questions about your sales or how to use "
-    "your restocking budget."
+    for column in expected_columns:
+        if column not in extracted_df.columns:
+            extracted_df[column] = None
+
+    extracted_df = extracted_df[expected_columns]
+
+    reviewed_sales = st.data_editor(
+        extracted_df,
+        num_rows="dynamic",
+        use_container_width=True,
+        key="reviewed_sales_editor",
+        column_config={
+            "date": st.column_config.TextColumn("Date"),
+            "product": st.column_config.TextColumn("Product"),
+            "quantity": st.column_config.NumberColumn(
+                "Quantity",
+                min_value=0,
+            ),
+            "unit_price": st.column_config.NumberColumn(
+                "Unit price (₦)",
+                min_value=0,
+            ),
+            "total_amount": st.column_config.NumberColumn(
+                "Total amount (₦)",
+                min_value=0,
+            ),
+        },
+    )
+
+    st.caption(
+        "If a figure is unclear, check your original sales book "
+        "rather than guessing."
+    )
+
+
+# Prepare business information for Kasuwa's chat.
+business_context = (
+    f"The trader's available restocking budget is ₦{budget:,.2f}."
 )
 
-question = st.text_area(
-    "What would you like to know?",
-    placeholder=(
-        "Example: Which products should I restock "
-        "with my current budget?"
+if sales_data is not None:
+    business_context += (
+        "\nUploaded spreadsheet columns: "
+        + ", ".join(map(str, sales_data.columns))
+        + "\nUploaded spreadsheet records:\n"
+        + sales_data.head(100).to_csv(index=False)
     )
+
+if reviewed_sales is not None and not reviewed_sales.empty:
+    business_context += (
+        "\nSales records extracted from photos and reviewed by "
+        "the trader:\n"
+        + reviewed_sales.to_csv(index=False)
+    )
+
+
+st.divider()
+st.header("3. Ask Kasuwa AI")
+
+question = st.text_area(
+    "What would you like help with?",
+    placeholder=(
+        "Example: Based on my sales, which products should I "
+        "consider restocking with my budget?"
+    ),
 )
 
 if st.button("Ask Kasuwa AI", type="primary"):
-
     if not question.strip():
         st.warning("Please enter a question first.")
-
     else:
-        # Build context for the AI
-        business_context = (
-            f"Restocking budget: ₦{budget:,.2f}\n"
-        )
-
-        if sales_data is not None:
-            business_context += (
-                "\nSales records:\n"
-                + sales_data.head(50).to_string(index=False)
-            )
-        else:
-            business_context += (
-                "\nNo spreadsheet records have been processed. "
-                "Do not invent sales figures."
-            )
-
         with st.spinner("Kasuwa AI is thinking..."):
-            answer = ask_gemma(
-                question,
-                business_context
-            )
+            answer = ask_gemma(question, business_context)
 
-        st.subheader("💡 Kasuwa AI's Answer")
+        st.markdown("### Kasuwa AI's Response")
         st.write(answer)
 
-st.divider()
-
 st.caption(
-    "Kasuwa AI — helping small business owners "
-    "make smarter business decisions."
+    "Kasuwa AI is under development. Verify extracted records "
+    "and recommendations before making purchasing decisions."
 )
