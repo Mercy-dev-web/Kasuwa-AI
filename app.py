@@ -28,9 +28,16 @@ budget = st.number_input(
 )
 
 uploaded_file = st.file_uploader(
-    "Upload your sales records (CSV or Excel or Document)",
-    type=["csv", "xlsx", "xls", "docx"]
+    "Upload your sales records or photos of your sales book",
+    type=["csv", "xlsx", "xls", "docx", "png", "jpg", "jpeg"],
+    accept_multiple_files=True,
+    help="Upload spreadsheets or up to 15 photos of your sales book."
 )
+
+if uploaded_file and len(uploaded_file) > 8:
+    st.warning("Please upload a maximum of 8 files.")
+    uploaded_file = None
+
 
 business_context = (
     f"The trader's available restocking budget is ₦{budget:,.2f}."
