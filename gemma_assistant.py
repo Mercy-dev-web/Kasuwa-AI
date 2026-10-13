@@ -55,7 +55,41 @@ def ask_gemma(question, business_context=""):
                 f"{response.text[:500]}"
             )
 
-        data = response.json()
+        
+data = response.json()
+choices = data.get("choices", [])
+
+if not choices:
+    return f"No answer returned. Response: {str(data)[:1000]}"
+
+choice = choices[0]
+message = choice.get("message", {})
+content = message.get("content")
+
+if isinstance(content, str) and content.strip():
+    return content
+
+if isinstance(content, list):
+    parts = []
+    for item in content:
+        if isinstance(item, dict) and item.get("text"):
+            parts.append(item["text"])
+    if parts:
+        return "\n".join(parts)
+
+if message.get("reasoning"):
+    return (
+        "The model returned reasoning but no final answer. "
+        "Please try again or use another model."
+    )
+
+return (
+    "The provider returned no readable text. "
+    f"Finish reason: {choice.get('finish_reason')}. "
+    f"Message fields: {list(message.keys())}. "
+    f"Response fields: {list(data.keys())}."
+)
+
         choices = data.get("choices", [])
 
         if not choices:
