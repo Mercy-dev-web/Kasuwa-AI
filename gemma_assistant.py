@@ -69,7 +69,7 @@ def ask_gemma(question, business_context=""):
                         ),
                     },
                 ],
-                "max_tokens": 800,
+                "max_tokens": 4000,
                 "temperature": 0.3,
                 "reasoning": {"effort": "low"},
             },
