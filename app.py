@@ -45,24 +45,64 @@ business_context = (
 
 if uploaded_file is not None:
     try:
-        if uploaded_file.name.lower().endswith(".csv"):
-            sales_data = pd.read_csv(uploaded_file)
+        if uploaded_file:
+    try:
+        dataframes = []
+
+        for file in uploaded_file:
+            filename = file.name.lower()
+
+            if filename.endswith(".csv"):
+                df = pd.read_csv(file)
+            elif filename.endswith((".xlsx", ".xls")):
+                df = pd.read_excel(file)
+            elif filename.endswith(".docx"):
+                st.info(
+                    f"{file.name}: Word documents need "
+                    "a separate text-reading step."
+                )
+                continue
+            elif filename.endswith((".png", ".jpg", ".jpeg")):
+                st.info(
+                    f"{file.name}: Photo uploaded. "
+                    "Image reading will be added next."
+                )
+                continue
+            else:
+                continue
+
+            df["source_file"] = file.name
+            dataframes.append(df)
+
+        if dataframes:
+            sales_data = pd.concat(
+                dataframes,
+                ignore_index=True
+            )
+
+            st.success("Sales records processed successfully!")
+
+            st.write("Preview of your records")
+            st.dataframe(
+                sales_data.head(10),
+                use_container_width=True
+            )
+
+            st.metric("Total records", len(sales_data))
+            st.write(
+                "Available columns:",
+                ", ".join(map(str, sales_data.columns))
+            )
         else:
-            sales_data = pd.read_excel(uploaded_file)
+            st.warning(
+                "No spreadsheet records found yet. "
+                "Photos are accepted, but image reading "
+                "has not been connected."
+            )
 
-        st.success("Sales records uploaded successfully!")
+    except Exception as e:
+        st.error(f"Could not process the uploaded files: {e}")
 
-        st.write("Preview of your records")
-        st.dataframe(
-            sales_data.head(10),
-            use_container_width=True
-        )
-
-        st.metric("Total records", len(sales_data))
-        st.write(
-            "Available columns:",
-            ", ".join(map(str, sales_data.columns))
-        )
 
         summary = sales_data.head(100).to_csv(index=False)
 
