@@ -18,7 +18,6 @@ st.write(
 )
 
 st.divider()
-
 st.header("1. Your Business")
 
 budget = st.number_input(
@@ -33,17 +32,16 @@ uploaded_file = st.file_uploader(
     type=["csv", "xlsx", "xls"]
 )
 
-
 business_context = (
     f"The trader's available restocking budget is ₦{budget:,.2f}."
 )
 
 if uploaded_file is not None:
     try:
-        if uploaded_file.name.endswith(".csv"):
-        sales_data = pd.read_csv(uploaded_file)
-else:
-    sales_data = pd.read_excel(uploaded_file)
+        if uploaded_file.name.lower().endswith(".csv"):
+            sales_data = pd.read_csv(uploaded_file)
+        else:
+            sales_data = pd.read_excel(uploaded_file)
 
         st.success("Sales records uploaded successfully!")
 
@@ -54,27 +52,24 @@ else:
         )
 
         st.metric("Total records", len(sales_data))
-        st.write("Available columns:", ", ".join(sales_data.columns))
+        st.write(
+            "Available columns:",
+            ", ".join(map(str, sales_data.columns))
+        )
 
-        # Summarise the uploaded data for the AI
         summary = sales_data.head(100).to_csv(index=False)
 
         business_context += (
-            "\nUploaded CSV columns: "
-            + ", ".join(sales_data.columns)
+            "\nUploaded file columns: "
+            + ", ".join(map(str, sales_data.columns))
             + "\nSample of uploaded sales records:\n"
             + summary
         )
 
     except Exception as error:
-        st.error(f"Could not read the CSV file: {error}")
-        business_context = (
-            f"The trader has a restocking budget of ₦{budget:,.2f}, "
-            "but their uploaded file could not be read."
-        )
+        st.error(f"Could not read the uploaded file: {error}")
 
 st.divider()
-
 st.header("2. Ask Kasuwa AI")
 
 question = st.text_area(
