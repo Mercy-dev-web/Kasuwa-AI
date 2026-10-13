@@ -1,3 +1,4 @@
+
 import requests
 import streamlit as st
 
@@ -6,15 +7,12 @@ API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
 def ask_gemma(question, business_context=""):
-    """Ask Gemma to help a small business owner."""
+    """Ask an open-weight AI model to help a small business owner."""
 
     try:
         api_key = st.secrets["OPENROUTER_API_KEY"]
     except Exception:
-        return (
-            "OpenRouter is not configured. "
-            "Check OPENROUTER_API_KEY in Streamlit Secrets."
-        )
+        return "OpenRouter API key is missing from Streamlit Secrets."
 
     try:
         response = requests.post(
@@ -30,13 +28,11 @@ def ask_gemma(question, business_context=""):
                     {
                         "role": "system",
                         "content": (
-                            "You are Kasuwa AI, a helpful business "
-                            "assistant for small business owners. "
-                            "Explain sales patterns and stocking "
-                            "decisions in simple language. Use only "
-                            "provided information. Never invent sales "
-                            "figures, costs, or stock levels. If "
-                            "information is missing, say so clearly."
+                            "You are Kasuwa AI, a helpful assistant for "
+                            "small business owners. Explain sales and "
+                            "restocking decisions simply. Use only the "
+                            "provided information. Never invent figures. "
+                            "If information is missing, say so."
                         ),
                     },
                     {
@@ -55,19 +51,28 @@ def ask_gemma(question, business_context=""):
 
         if not response.ok:
             return (
-                f"OpenRouter returned error {response.status_code}: "
+                f"OpenRouter error {response.status_code}: "
                 f"{response.text[:500]}"
             )
 
         data = response.json()
-        content = data["choices"][0]["message"].get("content")
+        choices = data.get("choices", [])
 
-if content:
-    return content
+        if not choices:
+            return "The AI provider returned no answer. Please try again."
 
-return "The AI provider returned an empty response. Please try again."
+        message = choices[0].get("message", {})
+        content = message.get("content")
+
+        if isinstance(content, str) and content.strip():
+            return content
+
+        return (
+            "The AI provider returned an empty answer. "
+            "Please try again."
+        )
 
     except requests.RequestException as error:
         return f"Could not connect to OpenRouter: {error}"
-    except (KeyError, ValueError, TypeError) as error:
-        return f"Unexpected response from the AI service: {error}"
+    except (ValueError, TypeError, KeyError) as error:
+        return f"Could not read the AI response: {error}"
