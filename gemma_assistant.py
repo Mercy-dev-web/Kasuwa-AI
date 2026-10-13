@@ -60,7 +60,12 @@ def ask_gemma(question, business_context=""):
             )
 
         data = response.json()
-        return data["choices"][0]["message"]["content"]
+        content = data["choices"][0]["message"].get("content")
+
+if content:
+    return content
+
+return "The AI provider returned an empty response. Please try again."
 
     except requests.RequestException as error:
         return f"Could not connect to OpenRouter: {error}"
