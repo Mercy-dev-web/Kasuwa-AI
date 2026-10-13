@@ -1,58 +1,68 @@
+import requests
 import streamlit as st
-from huggingface_hub import InferenceClient
 
-MODEL_ID = "google/gemma-3-4b-it"
+MODEL_ID = "google/gemma-4-31b-it:free"
+API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
 def ask_gemma(question, business_context=""):
-    """Ask Gemma a question about a small business."""
+    """Ask Gemma to help a small business owner."""
 
     try:
-        token = st.secrets["HF_TOKEN"]
+        api_key = st.secrets["OPENROUTER_API_KEY"]
     except Exception:
         return (
-            "Gemma is not connected yet. "
-            "Please check the HF_TOKEN secret in Streamlit Cloud."
+            "OpenRouter is not configured. "
+            "Check OPENROUTER_API_KEY in Streamlit Secrets."
         )
 
     try:
-        client = InferenceClient(
-            model=MODEL_ID,
-            provider="auto",
-            api_key=token,
+        response = requests.post(
+            API_URL,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "X-OpenRouter-Title": "Kasuwa AI",
+            },
+            json={
+                "model": MODEL_ID,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are Kasuwa AI, a helpful business "
+                            "assistant for small business owners. "
+                            "Explain sales patterns and stocking "
+                            "decisions in simple language. Use only "
+                            "provided information. Never invent sales "
+                            "figures, costs, or stock levels. If "
+                            "information is missing, say so clearly."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Business information:\n{business_context}\n\n"
+                            f"Trader's question:\n{question}"
+                        ),
+                    },
+                ],
+                "max_tokens": 300,
+                "temperature": 0.3,
+            },
+            timeout=60,
         )
 
-        response = client.chat_completion(
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are Kasuwa AI, a helpful business assistant "
-                        "for small business owners. Explain sales patterns "
-                        "and stocking decisions in simple language. Use "
-                        "only the information provided. Never invent sales "
-                        "figures, costs, or stock levels. Clearly state "
-                        "when information is missing."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"Business information:\n{business_context}\n\n"
-                        f"Trader's question:\n{question}"
-                    ),
-                },
-            ],
-            max_tokens=300,
-            temperature=0.3,
-        )
+        if not response.ok:
+            return (
+                f"OpenRouter returned error {response.status_code}: "
+                f"{response.text[:500]}"
+            )
 
-        return response.choices[0].message.content
+        data = response.json()
+        return data["choices"][0]["message"]["content"]
 
-    except Exception as error:
-        return (
-            "I couldn't get a response from Gemma. "
-            "Please check the Hugging Face token, model access, "
-            "and inference provider settings. "
-            f"Technical detail: {error}"
-        )
+    except requests.RequestException as error:
+        return f"Could not connect to OpenRouter: {error}"
+    except (KeyError, ValueError, TypeError) as error:
+        return f"Unexpected response from the AI service: {error}"
